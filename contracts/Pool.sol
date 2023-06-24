@@ -71,7 +71,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
 
     constructor() ERC20("", "") ERC20Permit("") {}
 
-    function initialize(address _token0, address _token1, bool _stable) external {
+    function initialize(address _token0, address _token1, bool _stable) external { // @audit-ok similar to old Pair constrcutor
         if (factory != address(0)) revert FactoryAlreadySet();
         factory = _msgSender();
         _voter = IPoolFactory(factory).voter();
@@ -103,15 +103,15 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
         _symbol = __symbol;
     }
 
-    function observationLength() external view returns (uint256) {
+    function observationLength() external view returns (uint256) { // @audit-ok the same as old Pair
         return observations.length;
     }
 
-    function lastObservation() public view returns (Observation memory) {
+    function lastObservation() public view returns (Observation memory) { // @audit-ok the same as old Pair
         return observations[observations.length - 1];
     }
 
-    function metadata()
+    function metadata() // @audit-ok the same as old Pair
         external
         view
         returns (uint256 dec0, uint256 dec1, uint256 r0, uint256 r1, bool st, address t0, address t1)
@@ -124,7 +124,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
     }
 
     // claim accumulated but unclaimed fees (viewable via claimable0 and claimable1)
-    function claimFees() external returns (uint256 claimed0, uint256 claimed1) {
+    function claimFees() external returns (uint256 claimed0, uint256 claimed1) { // @audit-ok the same as old Pair
         address sender = _msgSender();
         _updateFor(sender);
 
@@ -142,7 +142,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
     }
 
     // Accrue fees on token0
-    function _update0(uint256 amount) internal {
+    function _update0(uint256 amount) internal { // @audit-ok the same as old Pair
         // Only update on this pool if there is a fee
         if (amount == 0) return;
         IERC20(token0).safeTransfer(poolFees, amount); // transfer the fees out to PoolFees
@@ -154,7 +154,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
     }
 
     // Accrue fees on token1
-    function _update1(uint256 amount) internal {
+    function _update1(uint256 amount) internal { // @audit-ok the same as old Pair
         // Only update on this pool if there is a fee
         if (amount == 0) return;
         IERC20(token1).safeTransfer(poolFees, amount);
@@ -167,8 +167,8 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
 
     // this function MUST be called on any balance changes, otherwise can be used to infinitely claim fees
     // Fees are segregated from core funds, so fees can never put liquidity at risk
-    function _updateFor(address recipient) internal {
-        uint256 _supplied = balanceOf(recipient); // get LP balance of `recipient`
+    function _updateFor(address recipient) internal { // @audit-ok the same as old Pair
+        uint256 _supplied = balanceOf(recipient); // get LP balance of `recipient` // @audit-info use function balanceOf instead of variable as in old Pair
         if (_supplied > 0) {
             uint256 _supplyIndex0 = supplyIndex0[recipient]; // get last adjusted index0 for recipient
             uint256 _supplyIndex1 = supplyIndex1[recipient];
@@ -192,14 +192,14 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
         }
     }
 
-    function getReserves() public view returns (uint256 _reserve0, uint256 _reserve1, uint256 _blockTimestampLast) {
+    function getReserves() public view returns (uint256 _reserve0, uint256 _reserve1, uint256 _blockTimestampLast) { // @audit-ok the same as old Pair
         _reserve0 = reserve0;
         _reserve1 = reserve1;
         _blockTimestampLast = blockTimestampLast;
     }
 
     // update reserves and, on the first call per block, price accumulators
-    function _update(uint256 balance0, uint256 balance1, uint256 _reserve0, uint256 _reserve1) internal {
+    function _update(uint256 balance0, uint256 balance1, uint256 _reserve0, uint256 _reserve1) internal { // @audit-ok the same as old Pair
         uint256 blockTimestamp = block.timestamp;
         uint256 timeElapsed = blockTimestamp - blockTimestampLast;
         if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
@@ -219,7 +219,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
     }
 
     // produces the cumulative price using counterfactuals to save gas and avoid a call to sync.
-    function currentCumulativePrices()
+    function currentCumulativePrices() // @audit-ok the same as old Pair
         public
         view
         returns (uint256 reserve0Cumulative, uint256 reserve1Cumulative, uint256 blockTimestamp)
@@ -239,7 +239,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
     }
 
     // provides twap price with user configured granularity, up to the full window size
-    function quote(address tokenIn, uint256 amountIn, uint256 granularity) external view returns (uint256 amountOut) {
+    function quote(address tokenIn, uint256 amountIn, uint256 granularity) external view returns (uint256 amountOut) { // @audit-ok the same as old Pair
         uint256[] memory _prices = sample(tokenIn, amountIn, granularity, 1);
         uint256 priceAverageCumulative;
         uint256 _length = _prices.length;
@@ -250,7 +250,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
     }
 
     // returns a memory set of twap prices
-    function prices(address tokenIn, uint256 amountIn, uint256 points) external view returns (uint256[] memory) {
+    function prices(address tokenIn, uint256 amountIn, uint256 points) external view returns (uint256[] memory) { // @audit-ok the same as old Pair
         return sample(tokenIn, amountIn, points, 1);
     }
 
@@ -259,7 +259,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
         uint256 amountIn,
         uint256 points,
         uint256 window
-    ) public view returns (uint256[] memory) {
+    ) public view returns (uint256[] memory) { // @audit-ok the same as old Pair
         uint256[] memory _prices = new uint256[](points);
 
         uint256 length = observations.length - 1;
@@ -295,12 +295,12 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
         uint256 _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
         if (_totalSupply == 0) {
             liquidity = Math.sqrt(_amount0 * _amount1) - MINIMUM_LIQUIDITY;
-            _mint(address(1), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens - cannot be address(0)
-            if (stable) {
+            _mint(address(1), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens - cannot be address(0) // @audit changed 0 to 1 from oldPair
+            if (stable) { // @audit check this, not in oldPair
                 if ((_amount0 * 1e18) / decimals0 != (_amount1 * 1e18) / decimals1) revert DepositsNotEqual();
                 if (_k(_amount0, _amount1) <= MINIMUM_K) revert BelowMinimumK();
             }
-        } else {
+        } else { // @audit-ok the rest is the same as old Pair
             liquidity = Math.min((_amount0 * _totalSupply) / _reserve0, (_amount1 * _totalSupply) / _reserve1);
         }
         if (liquidity == 0) revert InsufficientLiquidityMinted();
@@ -312,7 +312,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
 
     // this low-level function should be called from a contract which performs important safety checks
     // standard uniswap v2 implementation
-    function burn(address to) external nonReentrant returns (uint256 amount0, uint256 amount1) {
+    function burn(address to) external nonReentrant returns (uint256 amount0, uint256 amount1) { // @audit-ok the same as old Pair
         (uint256 _reserve0, uint256 _reserve1) = (reserve0, reserve1);
         (address _token0, address _token1) = (token0, token1);
         uint256 _balance0 = IERC20(_token0).balanceOf(address(this));
@@ -330,11 +330,11 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
         _balance1 = IERC20(_token1).balanceOf(address(this));
 
         _update(_balance0, _balance1, _reserve0, _reserve1);
-        emit Burn(_msgSender(), to, amount0, amount1);
+        emit Burn(_msgSender(), to, amount0, amount1); // @audit-info use _msgSender() instead of msg.sender and different order
     }
 
     // this low-level function should be called from a contract which performs important safety checks
-    function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external nonReentrant {
+    function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external nonReentrant { // @audit-ok the same as oldPair, use revert instead of require
         if (IPoolFactory(factory).isPaused()) revert IsPaused();
         if (amount0Out == 0 && amount1Out == 0) revert InsufficientOutputAmount();
         (uint256 _reserve0, uint256 _reserve1) = (reserve0, reserve1);
@@ -348,7 +348,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
             if (to == _token0 || to == _token1) revert InvalidTo();
             if (amount0Out > 0) IERC20(_token0).safeTransfer(to, amount0Out); // optimistically transfer tokens
             if (amount1Out > 0) IERC20(_token1).safeTransfer(to, amount1Out); // optimistically transfer tokens
-            if (data.length > 0) IPoolCallee(to).hook(_msgSender(), amount0Out, amount1Out, data); // callback, used for flash loans
+            if (data.length > 0) IPoolCallee(to).hook(_msgSender(), amount0Out, amount1Out, data); // callback, used for flash loans // @audit-info use _msgSender() instead of msg.sender
             _balance0 = IERC20(_token0).balanceOf(address(this));
             _balance1 = IERC20(_token1).balanceOf(address(this));
         }
@@ -358,7 +358,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
         {
             // scope for reserve{0,1}Adjusted, avoids stack too deep errors
             (address _token0, address _token1) = (token0, token1);
-            if (amount0In > 0) _update0((amount0In * IPoolFactory(factory).getFee(address(this), stable)) / 10000); // accrue fees for token0 and move them out of pool
+            if (amount0In > 0) _update0((amount0In * IPoolFactory(factory).getFee(address(this), stable)) / 10000); // accrue fees for token0 and move them out of pool // @audit-info getFee has additional param, return value is ok
             if (amount1In > 0) _update1((amount1In * IPoolFactory(factory).getFee(address(this), stable)) / 10000); // accrue fees for token1 and move them out of pool
             _balance0 = IERC20(_token0).balanceOf(address(this)); // since we removed tokens, we need to reconfirm balances, can also simply use previous balance - amountIn/ 10000, but doing balanceOf again as safety check
             _balance1 = IERC20(_token1).balanceOf(address(this));
@@ -371,28 +371,28 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
     }
 
     // force balances to match reserves
-    function skim(address to) external nonReentrant {
+    function skim(address to) external nonReentrant { // @audit-ok the same as oldPair
         (address _token0, address _token1) = (token0, token1);
         IERC20(_token0).safeTransfer(to, IERC20(_token0).balanceOf(address(this)) - (reserve0));
         IERC20(_token1).safeTransfer(to, IERC20(_token1).balanceOf(address(this)) - (reserve1));
     }
 
     // force reserves to match balances
-    function sync() external nonReentrant {
+    function sync() external nonReentrant { // @audit-ok the same as oldPair
         _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)), reserve0, reserve1);
     }
 
-    function _f(uint256 x0, uint256 y) internal pure returns (uint256) {
+    function _f(uint256 x0, uint256 y) internal pure returns (uint256) { // @todo fuzz test with oldPair impl
         uint256 _a = (x0 * y) / 1e18;
         uint256 _b = ((x0 * x0) / 1e18 + (y * y) / 1e18);
         return (_a * _b) / 1e18;
     }
 
-    function _d(uint256 x0, uint256 y) internal pure returns (uint256) {
+    function _d(uint256 x0, uint256 y) internal pure returns (uint256) { // @todo fuzz test with oldPair impl
         return (3 * x0 * ((y * y) / 1e18)) / 1e18 + ((((x0 * x0) / 1e18) * x0) / 1e18);
     }
 
-    function _get_y(uint256 x0, uint256 xy, uint256 y) internal view returns (uint256) {
+    function _get_y(uint256 x0, uint256 xy, uint256 y) internal view returns (uint256) { // @todo fuzz test with oldPair impl
         for (uint256 i = 0; i < 255; i++) {
             uint256 k = _f(x0, y);
             if (k < xy) {
@@ -434,13 +434,13 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
         revert("!y");
     }
 
-    function getAmountOut(uint256 amountIn, address tokenIn) external view returns (uint256) {
+    function getAmountOut(uint256 amountIn, address tokenIn) external view returns (uint256) { // @audit-ok the same as oldPair, only new impl for getFee
         (uint256 _reserve0, uint256 _reserve1) = (reserve0, reserve1);
         amountIn -= (amountIn * IPoolFactory(factory).getFee(address(this), stable)) / 10000; // remove fee from amount received
         return _getAmountOut(amountIn, tokenIn, _reserve0, _reserve1);
     }
 
-    function _getAmountOut(
+    function _getAmountOut( // @audit-ok the same as oldPair
         uint256 amountIn,
         address tokenIn,
         uint256 _reserve0,
@@ -460,7 +460,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
         }
     }
 
-    function _k(uint256 x, uint256 y) internal view returns (uint256) {
+    function _k(uint256 x, uint256 y) internal view returns (uint256) { // @audit-ok the same as oldPair
         if (stable) {
             uint256 _x = (x * 1e18) / decimals0;
             uint256 _y = (y * 1e18) / decimals1;

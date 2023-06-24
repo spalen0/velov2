@@ -20,7 +20,7 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 /// @author velodrome.finance, @pegahcarter
 /// @notice Router allows routes through any pools created by any factory adhering to univ2 interface.
 /// @dev Zapping and swapping support both v1 and v2. Adding liquidity supports v2 only.
-contract Router is IRouter, ERC2771Context {
+contract Router is IRouter, ERC2771Context { // @audit ERC2771Context use _msgSender() instead of msg.sender
     using SafeERC20 for IERC20;
 
     address public immutable factoryRegistry;
@@ -49,7 +49,7 @@ contract Router is IRouter, ERC2771Context {
         address _factory,
         address _voter,
         address _weth
-    ) ERC2771Context(_forwarder) {
+    ) ERC2771Context(_forwarder) { // @audit-info this enables using realy while keeping msg.sender but must use _msgSender()
         factoryRegistry = _factoryRegistry;
         v1Factory = _v1Factory;
         defaultFactory = _factory;
@@ -61,7 +61,7 @@ contract Router is IRouter, ERC2771Context {
         if (msg.sender != address(weth)) revert OnlyWETH();
     }
 
-    /// @inheritdoc IRouter
+    /// @inheritdoc IRouter  @audit-ok the same as v1, use revert instead of require
     function sortTokens(address tokenA, address tokenB) public pure returns (address token0, address token1) {
         if (tokenA == tokenB) revert SameAddresses();
         (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
@@ -73,15 +73,15 @@ contract Router is IRouter, ERC2771Context {
         address tokenA,
         address tokenB,
         bool stable,
-        address _factory
-    ) external view returns (address pool) {
+        address _factory // @audit additional param
+    ) external view returns (address pool) { // @audit-ok used for backwards compatibility
         return poolFor(tokenA, tokenB, stable, _factory);
     }
 
     /// @inheritdoc IRouter
     function poolFor(address tokenA, address tokenB, bool stable, address _factory) public view returns (address pool) {
         address _defaultFactory = defaultFactory;
-        address factory = _factory == address(0) ? _defaultFactory : _factory;
+        address factory = _factory == address(0) ? _defaultFactory : _factory; // @audit-info if param is null use default one
         if (!IFactoryRegistry(factoryRegistry).isPoolFactoryApproved(factory)) revert PoolFactoryDoesNotExist();
         address velo = IPoolFactory(_defaultFactory).velo();
         address veloV2 = IPoolFactory(_defaultFactory).veloV2();
@@ -93,13 +93,13 @@ contract Router is IRouter, ERC2771Context {
         }
 
         (address token0, address token1) = sortTokens(tokenA, tokenB);
-        if (factory != v1Factory) {
+        if (factory != v1Factory) { // @todo verify this, could be a problem, can we pass our own factory? what can we do with it?
             bytes32 salt = keccak256(abi.encodePacked(token0, token1, stable));
             pool = Clones.predictDeterministicAddress(IPoolFactory(factory).implementation(), salt, factory);
         } else {
             // backwards compatible with v1
-            bytes32 pairCodeHash = IPairFactoryV1(factory).pairCodeHash();
-            pool = address(
+            bytes32 pairCodeHash = IPairFactoryV1(factory).pairCodeHash(); // @audit not visible in router: https://optimistic.etherscan.io/address/0xa132dab612db5cb9fc9ac426a0cc215a3423f9c9#readContract
+            pool = address( // @audit-ok the same as v1
                 uint160(
                     uint256(
                         keccak256(
@@ -118,7 +118,7 @@ contract Router is IRouter, ERC2771Context {
 
     /// @dev given some amount of an asset and pool reserves, returns an equivalent amount of the other asset
     /// @dev this only accounts for volatile pools and may return insufficient liquidity for stable pools
-    function quoteLiquidity(
+    function quoteLiquidity( // @audit-ok the same as v1, use revert instead of require
         uint256 amountA,
         uint256 reserveA,
         uint256 reserveB
@@ -129,11 +129,11 @@ contract Router is IRouter, ERC2771Context {
     }
 
     /// @inheritdoc IRouter
-    function getReserves(
+    function getReserves( // @audit-ok the same as v1, use poolFor instead of pairFor
         address tokenA,
         address tokenB,
         bool stable,
-        address _factory
+        address _factory // @audit-info additional param, verified in poolFor
     ) public view returns (uint256 reserveA, uint256 reserveB) {
         (address token0, ) = sortTokens(tokenA, tokenB);
         (uint256 reserve0, uint256 reserve1, ) = IPool(poolFor(tokenA, tokenB, stable, _factory)).getReserves();
@@ -141,14 +141,14 @@ contract Router is IRouter, ERC2771Context {
     }
 
     /// @inheritdoc IRouter
-    function getAmountsOut(uint256 amountIn, Route[] memory routes) public view returns (uint256[] memory amounts) {
+    function getAmountsOut(uint256 amountIn, Route[] memory routes) public view returns (uint256[] memory amounts) { // @audit-ok use revert instead of require and poolFor instead of pairFor
         if (routes.length < 1) revert InvalidPath();
         amounts = new uint256[](routes.length + 1);
         amounts[0] = amountIn;
         uint256 _length = routes.length;
         for (uint256 i = 0; i < _length; i++) {
             address factory = routes[i].factory == address(0) ? defaultFactory : routes[i].factory; // default to v2
-            address pool = poolFor(routes[i].from, routes[i].to, routes[i].stable, factory);
+            address pool = poolFor(routes[i].from, routes[i].to, routes[i].stable, factory); // @audit-info factory value verified in poolFor
             if (IPoolFactory(factory).isPair(pool)) {
                 amounts[i + 1] = IPool(pool).getAmountOut(amounts[i], routes[i].from);
             }
@@ -156,11 +156,11 @@ contract Router is IRouter, ERC2771Context {
     }
 
     /// @inheritdoc IRouter
-    function quoteAddLiquidity(
+    function quoteAddLiquidity( // @audit-ok the same as v1
         address tokenA,
         address tokenB,
         bool stable,
-        address _factory,
+        address _factory, // @audit additional param, not validated but _addLiquidity uses defualt factory
         uint256 amountADesired,
         uint256 amountBDesired
     ) public view returns (uint256 amountA, uint256 amountB, uint256 liquidity) {
@@ -188,11 +188,11 @@ contract Router is IRouter, ERC2771Context {
     }
 
     /// @inheritdoc IRouter
-    function quoteRemoveLiquidity(
+    function quoteRemoveLiquidity( // @audit-ok the same as v1
         address tokenA,
         address tokenB,
         bool stable,
-        address _factory,
+        address _factory, // @audit additional param, not validated but _removeLiquidity uses default factory
         uint256 liquidity
     ) public view returns (uint256 amountA, uint256 amountB) {
         address _pool = IPoolFactory(_factory).getPair(tokenA, tokenB, stable);
@@ -208,7 +208,7 @@ contract Router is IRouter, ERC2771Context {
         amountB = (liquidity * reserveB) / _totalSupply; // using balances ensures pro-rata distribution
     }
 
-    function _addLiquidity(
+    function _addLiquidity(// @audit-ok the same as v1, use revert instead of require
         address tokenA,
         address tokenB,
         bool stable,
@@ -242,7 +242,7 @@ contract Router is IRouter, ERC2771Context {
     }
 
     /// @inheritdoc IRouter
-    function addLiquidity(
+    function addLiquidity( // @audit-ok the same as v1, use poolFor instead of getpairForPair
         address tokenA,
         address tokenB,
         bool stable,
@@ -269,7 +269,7 @@ contract Router is IRouter, ERC2771Context {
     }
 
     /// @inheritdoc IRouter
-    function addLiquidityETH(
+    function addLiquidityETH( // @audit-ok the same as v1, use poolFor instead of pairFor and _msgSender instead of msg.sender
         address token,
         bool stable,
         uint256 amountTokenDesired,
@@ -299,7 +299,7 @@ contract Router is IRouter, ERC2771Context {
     // **** REMOVE LIQUIDITY ****
 
     /// @inheritdoc IRouter
-    function removeLiquidity(
+    function removeLiquidity( // @audit-ok the same as v1, use revert instead of require and _msgSender instead of msg.sender and poolFor insteaed of pairFor
         address tokenA,
         address tokenB,
         bool stable,
@@ -310,7 +310,7 @@ contract Router is IRouter, ERC2771Context {
         uint256 deadline
     ) public ensure(deadline) returns (uint256 amountA, uint256 amountB) {
         address pool = poolFor(tokenA, tokenB, stable, defaultFactory);
-        IERC20(pool).safeTransferFrom(_msgSender(), pool, liquidity);
+        IERC20(pool).safeTransferFrom(_msgSender(), pool, liquidity); // @audit not wrapped in requre() but using safeTransferFrom instead of transferFrom
         (uint256 amount0, uint256 amount1) = IPool(pool).burn(to);
         (address token0, ) = sortTokens(tokenA, tokenB);
         (amountA, amountB) = tokenA == token0 ? (amount0, amount1) : (amount1, amount0);
@@ -319,7 +319,7 @@ contract Router is IRouter, ERC2771Context {
     }
 
     /// @inheritdoc IRouter
-    function removeLiquidityETH(
+    function removeLiquidityETH( // @audit-ok the same as v1
         address token,
         bool stable,
         uint256 liquidity,
@@ -342,9 +342,9 @@ contract Router is IRouter, ERC2771Context {
         weth.withdraw(amountETH);
         _safeTransferETH(to, amountETH);
     }
-
+// @audit missing remove liqudiity with permit
     // **** REMOVE LIQUIDITY (supporting fee-on-transfer tokens) ****
-    function removeLiquidityETHSupportingFeeOnTransferTokens(
+    function removeLiquidityETHSupportingFeeOnTransferTokens( // @audit-ok new function
         address token,
         bool stable,
         uint256 liquidity,
@@ -363,14 +363,14 @@ contract Router is IRouter, ERC2771Context {
             address(this),
             deadline
         );
-        _safeTransfer(token, to, IERC20(token).balanceOf(address(this)));
+        _safeTransfer(token, to, IERC20(token).balanceOf(address(this))); // @audit-info using balanceOf instead of amountToken returned from removeLiquidity
         weth.withdraw(amountETH);
         _safeTransferETH(to, amountETH);
     }
 
     // **** SWAP ****
     /// @dev requires the initial amount to have already been sent to the first pool
-    function _swap(uint256[] memory amounts, Route[] memory routes, address _to) internal virtual {
+    function _swap(uint256[] memory amounts, Route[] memory routes, address _to) internal virtual { // @audit-ok the same as v1, use poolFor instead of pairFor
         uint256 _length = routes.length;
         for (uint256 i = 0; i < _length; i++) {
             (address token0, ) = sortTokens(routes[i].from, routes[i].to);
@@ -378,7 +378,7 @@ contract Router is IRouter, ERC2771Context {
             (uint256 amount0Out, uint256 amount1Out) = routes[i].from == token0
                 ? (uint256(0), amountOut)
                 : (amountOut, uint256(0));
-            address to = i < routes.length - 1
+            address to = i < routes.length - 1 // @audit-issue use `_length` to save gas
                 ? poolFor(routes[i + 1].from, routes[i + 1].to, routes[i + 1].stable, routes[i + 1].factory)
                 : _to;
             IPool(poolFor(routes[i].from, routes[i].to, routes[i].stable, routes[i].factory)).swap(
@@ -389,8 +389,8 @@ contract Router is IRouter, ERC2771Context {
             );
         }
     }
-
-    function swapExactTokensForTokens(
+// @audit no function swapExactTokensForTokensSimple
+    function swapExactTokensForTokens( // @audit-ok the same as v1, use revert instead of require and _msgSender instead of msg.sender and poolFor instead of pairFor
         uint256 amountIn,
         uint256 amountOutMin,
         Route[] calldata routes,
@@ -408,7 +408,7 @@ contract Router is IRouter, ERC2771Context {
         _swap(amounts, routes, to);
     }
 
-    function swapExactETHForTokens(
+    function swapExactETHForTokens( // @audit-ok the same as v1, use revert instead of require and poolFor instead of pairFor
         uint256 amountOutMin,
         Route[] calldata routes,
         address to,
@@ -422,7 +422,7 @@ contract Router is IRouter, ERC2771Context {
         _swap(amounts, routes, to);
     }
 
-    function swapExactTokensForETH(
+    function swapExactTokensForETH( // @audit-ok the same as v1, use revert instead of require and poolFor instead of pairFor and _msgSender instead of msg.sender
         uint256 amountIn,
         uint256 amountOutMin,
         Route[] calldata routes,
@@ -443,7 +443,7 @@ contract Router is IRouter, ERC2771Context {
         _safeTransferETH(to, amounts[amounts.length - 1]);
     }
 
-    function UNSAFE_swapExactTokensForTokens(
+    function UNSAFE_swapExactTokensForTokens( // @audit-ok the same as v1, use poolFor instead of pairFor and _msgSender instead of msg.sender
         uint256[] memory amounts,
         Route[] calldata routes,
         address to,
@@ -461,7 +461,7 @@ contract Router is IRouter, ERC2771Context {
 
     // **** SWAP (supporting fee-on-transfer tokens) ****
     /// @dev requires the initial amount to have already been sent to the first pool
-    function _swapSupportingFeeOnTransferTokens(Route[] memory routes, address _to) internal virtual {
+    function _swapSupportingFeeOnTransferTokens(Route[] memory routes, address _to) internal virtual { // @audit-ok new function, similar to _swap but uses balanceOf and caluclates balance out via getAmountOut
         uint256 _length = routes.length;
         for (uint256 i; i < _length; i++) {
             (address token0, ) = sortTokens(routes[i].from, routes[i].to);
@@ -477,7 +477,7 @@ contract Router is IRouter, ERC2771Context {
             (uint256 amount0Out, uint256 amount1Out) = routes[i].from == token0
                 ? (uint256(0), amountOutput)
                 : (amountOutput, uint256(0));
-            address to = i < routes.length - 1
+            address to = i < routes.length - 1 // @audit-issue use _length instead of routes.length
                 ? poolFor(routes[i + 1].from, routes[i + 1].to, routes[i + 1].stable, routes[i + 1].factory)
                 : _to;
             IPool(pool).swap(amount0Out, amount1Out, to, new bytes(0));
@@ -485,7 +485,7 @@ contract Router is IRouter, ERC2771Context {
     }
 
     /// @inheritdoc IRouter
-    function swapExactTokensForTokensSupportingFeeOnTransferTokens(
+    function swapExactTokensForTokensSupportingFeeOnTransferTokens( // @audit-ok new function, similar to swapExactTokensForTokens
         uint256 amountIn,
         uint256 amountOutMin,
         Route[] calldata routes,
@@ -505,7 +505,7 @@ contract Router is IRouter, ERC2771Context {
     }
 
     /// @inheritdoc IRouter
-    function swapExactETHForTokensSupportingFeeOnTransferTokens(
+    function swapExactETHForTokensSupportingFeeOnTransferTokens( // @audit-ok new function, similar to swapExactETHForTokens but verifies min output at the end
         uint256 amountOutMin,
         Route[] calldata routes,
         address to,
@@ -522,7 +522,7 @@ contract Router is IRouter, ERC2771Context {
     }
 
     /// @inheritdoc IRouter
-    function swapExactTokensForETHSupportingFeeOnTransferTokens(
+    function swapExactTokensForETHSupportingFeeOnTransferTokens( // @audit-ok new function, similar to swap
         uint256 amountIn,
         uint256 amountOutMin,
         Route[] calldata routes,
@@ -544,7 +544,7 @@ contract Router is IRouter, ERC2771Context {
     }
 
     /// @inheritdoc IRouter
-    function zapIn(
+    function zapIn( // @todo define if we want to use zaps
         address tokenIn,
         uint256 amountInA,
         uint256 amountInB,
@@ -809,18 +809,18 @@ contract Router is IRouter, ERC2771Context {
         return (investment * 1e18) / (ratio + 1e18);
     }
 
-    function _safeTransferETH(address to, uint256 value) internal {
+    function _safeTransferETH(address to, uint256 value) internal { // @audit-ok the same as in v1, use revert instead of require
         (bool success, ) = to.call{value: value}(new bytes(0));
         if (!success) revert ETHTransferFailed();
     }
 
-    function _safeTransfer(address token, address to, uint256 value) internal {
+    function _safeTransfer(address token, address to, uint256 value) internal { // @audit-ok the same as in v1
         require(token.code.length > 0);
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(IERC20.transfer.selector, to, value));
         require(success && (data.length == 0 || abi.decode(data, (bool))));
     }
 
-    function _safeTransferFrom(address token, address from, address to, uint256 value) internal {
+    function _safeTransferFrom(address token, address from, address to, uint256 value) internal { // @audit-ok the same as in v1
         require(token.code.length > 0);
         (bool success, bytes memory data) = token.call(
             abi.encodeWithSelector(IERC20.transferFrom.selector, from, to, value)
