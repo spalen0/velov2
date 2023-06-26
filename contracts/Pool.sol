@@ -296,8 +296,8 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
         if (_totalSupply == 0) {
             liquidity = Math.sqrt(_amount0 * _amount1) - MINIMUM_LIQUIDITY;
             _mint(address(1), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens - cannot be address(0) // @audit changed 0 to 1 from oldPair
-            if (stable) { // @audit check this, not in oldPair
-                if ((_amount0 * 1e18) / decimals0 != (_amount1 * 1e18) / decimals1) revert DepositsNotEqual();
+            if (stable) { // @audit-info not in oldPair, ok
+                if ((_amount0 * 1e18) / decimals0 != (_amount1 * 1e18) / decimals1) revert DepositsNotEqual(); // @audit-info amounts for stable pair must be equal
                 if (_k(_amount0, _amount1) <= MINIMUM_K) revert BelowMinimumK();
             }
         } else { // @audit-ok the rest is the same as old Pair
@@ -382,17 +382,17 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
         _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)), reserve0, reserve1);
     }
 
-    function _f(uint256 x0, uint256 y) internal pure returns (uint256) { // @todo fuzz test with oldPair impl
+    function _f(uint256 x0, uint256 y) internal pure returns (uint256) { // @audit-issue fuzz failed, not producing the same results as old version, in some cases the return value is -1 (one less) comapred the old version
         uint256 _a = (x0 * y) / 1e18;
         uint256 _b = ((x0 * x0) / 1e18 + (y * y) / 1e18);
         return (_a * _b) / 1e18;
     }
 
-    function _d(uint256 x0, uint256 y) internal pure returns (uint256) { // @todo fuzz test with oldPair impl
+    function _d(uint256 x0, uint256 y) internal pure returns (uint256) { // @audit-ok fuzz tested with old version
         return (3 * x0 * ((y * y) / 1e18)) / 1e18 + ((((x0 * x0) / 1e18) * x0) / 1e18);
     }
 
-    function _get_y(uint256 x0, uint256 xy, uint256 y) internal view returns (uint256) { // @todo fuzz test with oldPair impl
+    function _get_y(uint256 x0, uint256 xy, uint256 y) internal view returns (uint256) { // @audit-issue fuzz failed, not producing the same results as old version, in some cases the return value is +1 (one more) comapred the old version. Explanied in function impl that some cases will produce +1 result
         for (uint256 i = 0; i < 255; i++) {
             uint256 k = _f(x0, y);
             if (k < xy) {
@@ -460,7 +460,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
         }
     }
 
-    function _k(uint256 x, uint256 y) internal view returns (uint256) { // @audit-ok the same as oldPair
+    function _k(uint256 x, uint256 y) internal view returns (uint256) { // @audit-ok the same as oldPair, fuzz tested with old version
         if (stable) {
             uint256 _x = (x * 1e18) / decimals0;
             uint256 _y = (y * 1e18) / decimals1;

@@ -5,7 +5,7 @@ import {IManagedRewardsFactory} from "../interfaces/factories/IManagedRewardsFac
 import {FreeManagedReward} from "../rewards/FreeManagedReward.sol";
 import {LockedManagedReward} from "../rewards/LockedManagedReward.sol";
 
-contract ManagedRewardsFactory is IManagedRewardsFactory {
+contract ManagedRewardsFactory is IManagedRewardsFactory { // @audit-ok
     /// @inheritdoc IManagedRewardsFactory
     function createRewards(
         address _forwarder,

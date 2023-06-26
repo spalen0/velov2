@@ -79,7 +79,7 @@ contract Router is IRouter, ERC2771Context { // @audit ERC2771Context use _msgSe
     }
 
     /// @inheritdoc IRouter
-    function poolFor(address tokenA, address tokenB, bool stable, address _factory) public view returns (address pool) {
+    function poolFor(address tokenA, address tokenB, bool stable, address _factory) public view returns (address pool) { // @audit-ok
         address _defaultFactory = defaultFactory;
         address factory = _factory == address(0) ? _defaultFactory : _factory; // @audit-info if param is null use default one
         if (!IFactoryRegistry(factoryRegistry).isPoolFactoryApproved(factory)) revert PoolFactoryDoesNotExist();
@@ -93,12 +93,12 @@ contract Router is IRouter, ERC2771Context { // @audit ERC2771Context use _msgSe
         }
 
         (address token0, address token1) = sortTokens(tokenA, tokenB);
-        if (factory != v1Factory) { // @todo verify this, could be a problem, can we pass our own factory? what can we do with it?
+        if (factory != v1Factory) {
             bytes32 salt = keccak256(abi.encodePacked(token0, token1, stable));
             pool = Clones.predictDeterministicAddress(IPoolFactory(factory).implementation(), salt, factory);
         } else {
             // backwards compatible with v1
-            bytes32 pairCodeHash = IPairFactoryV1(factory).pairCodeHash(); // @audit not visible in router: https://optimistic.etherscan.io/address/0xa132dab612db5cb9fc9ac426a0cc215a3423f9c9#readContract
+            bytes32 pairCodeHash = IPairFactoryV1(factory).pairCodeHash();
             pool = address( // @audit-ok the same as v1
                 uint160(
                     uint256(
@@ -767,7 +767,7 @@ contract Router is IRouter, ERC2771Context { // @audit ERC2771Context use _msgSe
 
     /// @dev Return residual assets from zapping.
     /// @param token token to return, put `ETHER` if you want Ether back.
-    function _returnAssets(address token) internal {
+    function _returnAssets(address token) internal { // @audit-ok
         address sender = _msgSender();
         uint256 balance;
         if (token == ETHER) {

@@ -98,9 +98,9 @@ contract Gauge is IGauge, ERC2771Context, ReentrancyGuard { // @audit ERC2771Con
     }
 
     /// @inheritdoc IGauge
-    function getReward(address _account) external nonReentrant { 
+    function getReward(address _account) external nonReentrant { // @audit-info only voter can call for any account
         address sender = _msgSender();
-        if (sender != _account && sender != voter) revert NotAuthorized();
+        if (sender != _account && sender != voter) revert NotAuthorized(); // @audit-issue voter can bypass this check and call getReward for any account, strange thing to do, why not use msgSender instead?
 
         _updateRewards(_account); // @audit-info updates the values
 
@@ -122,12 +122,12 @@ contract Gauge is IGauge, ERC2771Context, ReentrancyGuard { // @audit ERC2771Con
 
     /// @inheritdoc IGauge
     function deposit(uint256 _amount) external {
-        _depositFor(_amount, _msgSender());
+        _depositFor(_amount, _msgSender()); // @audit-info nonReentrant in implementation
     }
 
     /// @inheritdoc IGauge
     function deposit(uint256 _amount, address _recipient) external {
-        _depositFor(_amount, _recipient);
+        _depositFor(_amount, _recipient); // @audit-info nonReentrant in implementation
     }
 
     function _depositFor(uint256 _amount, address _recipient) internal nonReentrant { // @audit-ok
