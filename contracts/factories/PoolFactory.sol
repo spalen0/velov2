@@ -6,7 +6,7 @@ import {IPool} from "../interfaces/IPool.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
 contract PoolFactory is IPoolFactory { // @audit-ok
-    address public immutable implementation;
+    address public immutable implementation; // @audit-info the implementation of the pool
 
     bool public isPaused;
     address public pauser;

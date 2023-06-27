@@ -66,14 +66,14 @@ contract Gauge is IGauge, ERC2771Context, ReentrancyGuard { // @audit ERC2771Con
             (address _token0, address _token1) = IPool(stakingToken).tokens();
             if (_fees0 > DURATION) { // @audit use constant instead of internal_bribe.left value
                 fees0 = 0;
-                IERC20(_token0).safeApprove(feesVotingReward, _fees0);
+                IERC20(_token0).safeApprove(feesVotingReward, _fees0); // @audit-info approve only earned fees
                 IReward(feesVotingReward).notifyRewardAmount(_token0, _fees0); // renamed from IBribe(internal_bribe)
             } else {
                 fees0 = _fees0;
             }
             if (_fees1 > DURATION) { // @audit use constant instead of internal_bribe.left value
                 fees1 = 0;
-                IERC20(_token1).safeApprove(feesVotingReward, _fees1);
+                IERC20(_token1).safeApprove(feesVotingReward, _fees1); // @audit-info approve only earned fees
                 IReward(feesVotingReward).notifyRewardAmount(_token1, _fees1);
             } else {
                 fees1 = _fees1;
@@ -176,7 +176,7 @@ contract Gauge is IGauge, ERC2771Context, ReentrancyGuard { // @audit ERC2771Con
         if (sender != voter) revert NotVoter();
         if (_amount == 0) revert ZeroAmount();
         _claimFees();
-        rewardPerTokenStored = rewardPerToken(); // @audit-info updates values from snx modifier updateReward(address _account)
+        rewardPerTokenStored = rewardPerToken(); // @audit-info updates values, the as using snx modifier updateReward(address(0))
         uint256 timestamp = block.timestamp;
         uint256 timeUntilNext = VelodromeTimeLibrary.epochNext(timestamp) - timestamp;
 
@@ -199,7 +199,7 @@ contract Gauge is IGauge, ERC2771Context, ReentrancyGuard { // @audit ERC2771Con
         uint256 balance = IERC20(rewardToken).balanceOf(address(this));
         if (rewardRate > balance / timeUntilNext) revert RewardRateTooHigh();
 
-        lastUpdateTime = timestamp;
+        lastUpdateTime = timestamp; // @audit-info updates values, the as using snx modifier updateReward(address(0))
         periodFinish = timestamp + timeUntilNext;
         emit NotifyReward(sender, _amount);
     }

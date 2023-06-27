@@ -16,7 +16,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 /// @title Pool
 /// @author velodrome.finance, @figs999, @pegahcarter
 /// @notice Veldrome V2 token pool, either stable or volatile
-contract Pool is IPool, ERC20Permit, ReentrancyGuard {
+contract Pool is IPool, ERC20Permit, ReentrancyGuard { // @audit-info reentracy guard is used instead of lock for for all functions as in v1
     using SafeERC20 for IERC20;
 
     string private _name;
@@ -76,7 +76,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
         factory = _msgSender();
         _voter = IPoolFactory(factory).voter();
         (token0, token1, stable) = (_token0, _token1, _stable);
-        poolFees = address(new PoolFees(_token0, _token1));
+        poolFees = address(new PoolFees(_token0, _token1)); // @audit-info contract for collecting fees
         string memory symbol0 = ERC20(_token0).symbol();
         string memory symbol1 = ERC20(_token1).symbol();
         if (_stable) {
@@ -285,7 +285,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
 
     // this low-level function should be called by addLiquidity functions in Router.sol, which performs important safety checks
     // standard uniswap v2 implementation
-    function mint(address to) external nonReentrant returns (uint256 liquidity) {
+    function mint(address to) external nonReentrant returns (uint256 liquidity) { // @audit-ok added if (stable) check to verfiy that the pair is stable
         (uint256 _reserve0, uint256 _reserve1) = (reserve0, reserve1);
         uint256 _balance0 = IERC20(token0).balanceOf(address(this));
         uint256 _balance1 = IERC20(token1).balanceOf(address(this));
@@ -440,7 +440,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
         return _getAmountOut(amountIn, tokenIn, _reserve0, _reserve1);
     }
 
-    function _getAmountOut( // @audit-ok the same as oldPair
+    function _getAmountOut( // @audit-ok the same as oldPair, fuzz tested with old version
         uint256 amountIn,
         address tokenIn,
         uint256 _reserve0,
@@ -486,7 +486,7 @@ contract Pool is IPool, ERC20Permit, ReentrancyGuard {
     }
 
     function _beforeTokenTransfer(address from, address to, uint256) internal override {
-        _updateFor(from);
+        _updateFor(from); // @audit-info update fees for each user
         _updateFor(to);
     }
 }
