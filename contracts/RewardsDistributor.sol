@@ -14,7 +14,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
  * @author velodrome.finance, @figs999, @pegahcarter
  * @license MIT
  */
-contract RewardsDistributor is IRewardsDistributor {
+contract RewardsDistributor is IRewardsDistributor { // @audit see the differences with curve: https://github.com/curvefi/curve-dao-contracts/blob/master/contracts/FeeDistributor.vy
     using SafeERC20 for IERC20;
     uint256 constant WEEK = 7 * 86400;
 
@@ -25,11 +25,11 @@ contract RewardsDistributor is IRewardsDistributor {
     uint256[1000000000000000] public tokensPerWeek;
 
     IVotingEscrow public immutable ve;
-    address public token;
+    address public token; // @audit-issue can be set to immutable
     address public minter;
     uint256 public tokenLastBalance;
 
-    constructor(address _ve) {
+    constructor(address _ve) { // @audit-ok same as curve
         uint256 _t = (block.timestamp / WEEK) * WEEK;
         startTime = _t;
         lastTokenTime = _t;
@@ -40,7 +40,7 @@ contract RewardsDistributor is IRewardsDistributor {
         IERC20(_token).safeApprove(_ve, type(uint256).max);
     }
 
-    function _checkpointToken() internal {
+    function _checkpointToken() internal { // @audit-ok same as curve
         uint256 tokenBalance = IERC20(token).balanceOf(address(this));
         uint256 toDistribute = tokenBalance - tokenLastBalance;
         tokenLastBalance = tokenBalance;
@@ -75,7 +75,7 @@ contract RewardsDistributor is IRewardsDistributor {
     }
 
     /// @inheritdoc IRewardsDistributor
-    function checkpointToken() external {
+    function checkpointToken() external { // @audit only minter, a bit different from curve
         if (msg.sender != minter) revert NotMinter();
         _checkpointToken();
     }
@@ -128,7 +128,7 @@ contract RewardsDistributor is IRewardsDistributor {
     }
 
     /// @inheritdoc IRewardsDistributor
-    function claim(uint256 _tokenId) external returns (uint256) {
+    function claim(uint256 _tokenId) external returns (uint256) { // @audit missing nonreentrant lock check as in curve, but token is always velo2
         if (IMinter(minter).activePeriod() < ((block.timestamp / WEEK) * WEEK)) revert UpdatePeriod();
         if (ve.escrowType(_tokenId) == IVotingEscrow.EscrowType.LOCKED) revert NotManagedOrNormalNFT();
         uint256 _timestamp = block.timestamp;
@@ -139,7 +139,7 @@ contract RewardsDistributor is IRewardsDistributor {
             IVotingEscrow.LockedBalance memory _locked = ve.locked(_tokenId);
             if (_timestamp >= _locked.end && !_locked.isPermanent) {
                 address _owner = ve.ownerOf(_tokenId);
-                IERC20(token).safeTransfer(_owner, amount);
+                IERC20(token).safeTransfer(_owner, amount); // @audit-info velo2 is always sent to owner
             } else {
                 ve.depositFor(_tokenId, amount);
             }
@@ -149,7 +149,7 @@ contract RewardsDistributor is IRewardsDistributor {
     }
 
     /// @inheritdoc IRewardsDistributor
-    function claimMany(uint256[] calldata _tokenIds) external returns (bool) {
+    function claimMany(uint256[] calldata _tokenIds) external returns (bool) {  // @audit missing nonreentrant lock check as in curve, but token is always velo2
         if (IMinter(minter).activePeriod() < ((block.timestamp / WEEK) * WEEK)) revert UpdatePeriod();
         uint256 _timestamp = block.timestamp;
         uint256 _lastTokenTime = lastTokenTime;
@@ -166,7 +166,7 @@ contract RewardsDistributor is IRewardsDistributor {
                 IVotingEscrow.LockedBalance memory _locked = ve.locked(_tokenId);
                 if (_timestamp >= _locked.end && !_locked.isPermanent) {
                     address _owner = ve.ownerOf(_tokenId);
-                    IERC20(token).safeTransfer(_owner, amount);
+                    IERC20(token).safeTransfer(_owner, amount); // @audit-info velo2 is always sent to owner
                 } else {
                     ve.depositFor(_tokenId, amount);
                 }
@@ -181,7 +181,7 @@ contract RewardsDistributor is IRewardsDistributor {
     }
 
     /// @inheritdoc IRewardsDistributor
-    function setMinter(address _minter) external {
+    function setMinter(address _minter) external { // @audit-ok
         if (msg.sender != minter) revert NotMinter();
         minter = _minter;
     }

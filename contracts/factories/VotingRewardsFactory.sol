@@ -5,7 +5,7 @@ import {IVotingRewardsFactory} from "../interfaces/factories/IVotingRewardsFacto
 import {FeesVotingReward} from "../rewards/FeesVotingReward.sol";
 import {BribeVotingReward} from "../rewards/BribeVotingReward.sol";
 
-contract VotingRewardsFactory is IVotingRewardsFactory {
+contract VotingRewardsFactory is IVotingRewardsFactory { // @audit-ok
     /// @inheritdoc IVotingRewardsFactory
     function createRewards(
         address _forwarder,

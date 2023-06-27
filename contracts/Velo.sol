@@ -9,7 +9,7 @@ import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20P
 /// @author velodrome.finance
 /// @notice The native token in the Velodrome V2 ecosystem
 /// @dev Emitted by the Minter and in conversions from v1 VELO
-contract Velo is IVelo, ERC20Permit {
+contract Velo is IVelo, ERC20Permit { // @audit-ok
     address public minter;
     address private owner;
     address public sinkManager;

@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {IGaugeFactory} from "../interfaces/factories/IGaugeFactory.sol";
 import {Gauge} from "../gauges/Gauge.sol";
 
-contract GaugeFactory is IGaugeFactory {
+contract GaugeFactory is IGaugeFactory { // @audit-ok
     function createGauge(
         address _forwarder,
         address _pool,

@@ -7,7 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 /// @title PoolFees
 /// @notice Contract used as 1:1 pool relationship to split out fees.
 /// @notice Ensures curve does not need to be modified for LP shares.
-contract PoolFees {
+contract PoolFees { // @audit-ok
     using SafeERC20 for IERC20;
     address internal immutable pool; // The pool it is bonded to
     address internal immutable token0; // token0 of pool, saved localy and statically for gas optimization

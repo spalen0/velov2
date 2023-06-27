@@ -5,14 +5,14 @@ import {IPoolFactory} from "../interfaces/factories/IPoolFactory.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
-contract PoolFactory is IPoolFactory {
-    address public immutable implementation;
+contract PoolFactory is IPoolFactory { // @audit-ok
+    address public immutable implementation; // @audit-info the implementation of the pool
 
     bool public isPaused;
     address public pauser;
 
-    uint256 public stableFee;
-    uint256 public volatileFee;
+    uint256 public stableFee; // @audit-info fee can be changed by fee manager
+    uint256 public volatileFee; // @audit-info fee can be changed by fee manager
     uint256 public constant MAX_FEE = 100; // 1%
     // Override to indicate there is custom 0% fee - as a 0 value in the customFee mapping indicates
     // that no custom fee rate has been set
@@ -85,7 +85,7 @@ contract PoolFactory is IPoolFactory {
     }
 
     /// @inheritdoc IPoolFactory
-    function setSinkConverter(address _sinkConverter, address _velo, address _veloV2) external {
+    function setSinkConverter(address _sinkConverter, address _velo, address _veloV2) external { // @audit-ok
         if (msg.sender != sinkConverter) revert NotSinkConverter();
         sinkConverter = _sinkConverter;
         velo = _velo;
@@ -113,7 +113,7 @@ contract PoolFactory is IPoolFactory {
         emit SetPauser(_pauser);
     }
 
-    function setPauseState(bool _state) external {
+    function setPauseState(bool _state) external { // @audit-info isPaused can only pause swapping
         if (msg.sender != pauser) revert NotPauser();
         isPaused = _state;
         emit SetPauseState(_state);
@@ -127,7 +127,7 @@ contract PoolFactory is IPoolFactory {
     }
 
     /// @inheritdoc IPoolFactory
-    function setFee(bool _stable, uint256 _fee) external {
+    function setFee(bool _stable, uint256 _fee) external { // @audit-info change fee for stable or volatile
         if (msg.sender != feeManager) revert NotFeeManager();
         if (_fee > MAX_FEE) revert FeeTooHigh();
         if (_fee == 0) revert ZeroFee();
@@ -139,7 +139,7 @@ contract PoolFactory is IPoolFactory {
     }
 
     /// @inheritdoc IPoolFactory
-    function setCustomFee(address pool, uint256 fee) external {
+    function setCustomFee(address pool, uint256 fee) external { // @audit-info only feeManager can set custom fee
         if (msg.sender != feeManager) revert NotFeeManager();
         if (fee > MAX_FEE && fee != ZERO_FEE_INDICATOR) revert FeeTooHigh();
         if (!_isPool[pool]) revert InvalidPool();
@@ -155,14 +155,14 @@ contract PoolFactory is IPoolFactory {
     }
 
     /// @inheritdoc IPoolFactory
-    function createPool(address tokenA, address tokenB, uint24 fee) external returns (address pool) {
+    function createPool(address tokenA, address tokenB, uint24 fee) external returns (address pool) { // @audit-ok 
         if (fee > 1) revert FeeInvalid();
         bool stable = fee == 1;
         return createPool(tokenA, tokenB, stable);
     }
 
     /// @inheritdoc IPoolFactory
-    function createPool(address tokenA, address tokenB, bool stable) public returns (address pool) {
+    function createPool(address tokenA, address tokenB, bool stable) public returns (address pool) { // @audit-ok
         if (tokenA == tokenB) revert SameAddress();
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         if (token0 == address(0)) revert ZeroAddress();
@@ -178,7 +178,7 @@ contract PoolFactory is IPoolFactory {
     }
 
     /// @inheritdoc IPoolFactory
-    function createPair(address tokenA, address tokenB, bool stable) external returns (address pool) {
+    function createPair(address tokenA, address tokenB, bool stable) external returns (address pool) { // @audit-ok
         return createPool(tokenA, tokenB, stable);
     }
 }
